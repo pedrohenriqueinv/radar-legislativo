@@ -1,0 +1,65 @@
+:root {
+  /* Core Surfaces — Warm Newsprint Broadsheet Paper (amostrado de reference.jpg) */
+  --bg-ground: #F3EDE1;
+  --bg-surface: #FAF7F0;
+  --bg-surface-alt: #EDE5D6;
+  --bg-elevated: #FFFFFF;
+  --bg-inset: #E8DFCE;
+
+  /* Ink & Contrast (WCAG AA/AAA sobre papel creme #F3EDE1 e #FAF7F0) */
+  --ink-primary: #25201A;
+  --ink-secondary: #4B443A;
+  --ink-muted: #6C6357;
+  --ink-dim: #8D8374;
+
+  /* Broadsheet Hairlines & Dividers */
+  --border-rule: #25201A;
+  --border-subtle: rgba(37, 32, 26, 0.14);
+  --border-medium: rgba(37, 32, 26, 0.28);
+  --border-strong: rgba(37, 32, 26, 0.56);
+
+  /* Brand Accent — Terracotta Editorial (amostrado de reference.jpg: #B83628) */
+  --accent: #B83628;
+  --accent-bright: #CE4233;
+  --accent-deep: #96291D;
+  --accent-muted: rgba(184, 54, 40, 0.26);
+  --accent-soft: rgba(184, 54, 40, 0.10);
+  --accent-border: rgba(184, 54, 40, 0.36);
+  --ink-on-accent: #FAF7F0;
+
+  /* Semantic Status Colors (legibilidade alta sobre papel claro) */
+  --status-ok: #1D6848;
+  --status-ok-bg: #E2EFE7;
+  --status-ok-border: rgba(29, 104, 72, 0.35);
+
+  --status-warn: #8F5210;
+  --status-warn-bg: #F6E9D2;
+  --status-warn-border: rgba(143, 82, 16, 0.38);
+
+  --status-error: #A62920;
+  --status-error-bg: #F8DFDB;
+  --status-error-border: rgba(166, 41, 32, 0.38);
+
+  --status-info: #235390;
+  --status-info-bg: #E1E9F4;
+  --status-info-border: rgba(35, 83, 144, 0.35);
+
+  /* Typography */
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Scale — 1920x1080 Full-Presence Broadsheet Proportion */
+  --container-max: 1852px;
+  --gutter: clamp(16px, 1.9vw, 34px);
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Signature Editorial Easing (Contra Labs + Motion) */
+  --ease-editorial: cubic-bezier(0.48, 0.05, 0.35, 0.99);
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 160ms;
+  --duration-mid: 280ms;
+}
