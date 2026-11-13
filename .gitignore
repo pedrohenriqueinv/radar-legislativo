@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Environment & local preview databases
+.env
+.env.local
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/*.db
+logs/*.log
+!backend/data/radar_snapshot.sqlite
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+.vercel/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.tmp
