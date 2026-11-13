@@ -161,13 +161,13 @@ npm.cmd run preview -- --host 127.0.0.1 --port 5173
 
 Acesse `http://127.0.0.1:5173/` no navegador (em desenvolvimento com HMR, também funciona via `npm.cmd run dev`).
 
-### 4. Deploy na Vercel (Full-Stack)
+### 4. Deploy na Vercel (Full-Stack Services)
 
-O repositório já vem pré-configurado com [`vercel.json`](vercel.json), [`api/index.py`](api/index.py), [`requirements.txt`](requirements.txt) e snapshot inicial em [`backend/data/radar_snapshot.sqlite`](backend/data/radar_snapshot.sqlite):
+O repositório já vem pré-configurado com Vercel Services em [`vercel.json`](vercel.json), entrypoint FastAPI em [`backend/main.py`](backend/main.py) e snapshot inicial em [`backend/data/radar_snapshot.sqlite`](backend/data/radar_snapshot.sqlite):
 
-1. Importe o repositório `pedrohenriqueinv/radar-legislativo` diretamente na Vercel (sem precisar alterar o diretório raiz).
-2. A Vercel compila o frontend (`frontend/dist`) e sobe o backend FastAPI em `/api/*` via `api/index.py`.
-3. Sem variáveis extras, o modo `RADAR_STORAGE_MODE=auto` inicializa `/tmp` com o snapshot real já coletado. Para persistência externa em produção, defina `DATABASE_URL` (PostgreSQL) nas variáveis de ambiente da Vercel.
+1. Importe o repositório `pedrohenriqueinv/radar-legislativo` diretamente na Vercel (Application Preset **Services**, Root Directory `./`).
+2. A Vercel constrói o serviço `frontend` (Vite) e o serviço `backend` (FastAPI em `/api/*`) automaticamente no mesmo domínio.
+3. Sem variáveis extras, o modo `RADAR_STORAGE_MODE=auto` inicializa `/tmp` com o snapshot real já coletado. Para persistência externa em produção, defina `DATABASE_URL` (PostgreSQL) nas Environment Variables da Vercel.
 
 ---
 
