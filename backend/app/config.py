@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = PROJECT_ROOT / ".env"
 
 
@@ -59,7 +60,14 @@ class Settings(BaseSettings):
         raw = Path(self.snapshot_sqlite_path)
         if raw.is_absolute():
             return raw
-        return PROJECT_ROOT / raw
+        repo_candidate = PROJECT_ROOT / raw
+        if repo_candidate.exists():
+            return repo_candidate
+        # Quando o serviço Vercel roda isolado dentro de `backend/`, resolve relativo a BACKEND_DIR.
+        backend_candidate = BACKEND_DIR / "data" / raw.name
+        if backend_candidate.exists():
+            return backend_candidate
+        return repo_candidate
 
 
 @lru_cache
