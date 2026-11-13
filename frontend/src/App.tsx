@@ -374,7 +374,7 @@ export function App() {
         <div className="container footer-inner">
           <div>
             <strong>Radar Legislativo</strong> · Aplicação de exploração de dados públicos da Câmara
-            dos Deputados (CEAP).
+            dos Deputados (CEAP) com base PostgreSQL.
           </div>
           <div>
             Dados públicos oficiais via{' '}

@@ -83,7 +83,8 @@ export function CollectionDrawer({
 
             <p style={{ margin: '0 0 18px', fontSize: '0.9rem', color: 'var(--ink-secondary)' }}>
               O pipeline consulta a API v2 da Câmara dos Deputados para o estado e ano selecionados,
-              normaliza valores, deduplica registros e atualiza o banco preservando coletas válidas.
+              normaliza valores, deduplica registros e atualiza o banco PostgreSQL preservando
+              coletas válidas.
             </p>
 
             <form

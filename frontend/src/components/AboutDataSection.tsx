@@ -47,8 +47,8 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
               <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
                 Cada despesa passa por limpeza textual, parsing de datas, deduplicação por chave
                 SHA-256 idempotente (tratando <code className="mono">codDocumento=0</code> e múltiplos trechos
-                aéreos) e upsert relacional preservando execuções válidas anteriores em caso de falha
-                parcial.
+                aéreos) e upsert relacional em PostgreSQL preservando execuções válidas anteriores em
+                caso de falha parcial.
               </p>
             </article>
 
@@ -82,7 +82,7 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 Ambiente atual e documentação oficial
               </h3>
               <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-                Backend ativo: {health?.storage_label ?? 'Carregando...'} · Recorte atual: {overview?.uf ?? '—'}/{overview?.ano ?? '—'}
+                Banco ativo: {health?.database_connected === false ? 'PostgreSQL indisponível' : 'PostgreSQL'} · Recorte atual: {overview?.uf ?? '—'}/{overview?.ano ?? '—'}
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: '0.88rem' }}>

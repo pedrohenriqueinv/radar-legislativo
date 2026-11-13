@@ -35,9 +35,12 @@ export function OverviewSection({
   onOpenCollectionModal,
 }: OverviewSectionProps) {
   const statusInfo = getStatusMeta(overview?.situacao_coleta ?? 'nao_coletado');
-  const isPreviewStorage = (health?.storage_backend ?? meta?.storage_backend) === 'preview_sqlite';
-  const storageLabel =
-    health?.storage_label ?? meta?.storage_label ?? 'Verificando armazenamento';
+  const isOffline = health?.database_connected === false;
+  const storageLabel = isOffline
+    ? 'PostgreSQL indisponível'
+    : health || meta
+      ? 'PostgreSQL'
+      : 'Conectando ao PostgreSQL';
 
   return (
     <section id="visao-geral" className="page-section page-section--alt">
@@ -46,18 +49,19 @@ export function OverviewSection({
           <div>
             <h2 className="section-title">Visão geral do recorte</h2>
             <p className="section-subtitle">
-              Síntese operacional e financeira das despesas parlamentares persistidas para o estado
-              e ano selecionados, com sinalização explícita de integridade e atualização.
+              Síntese operacional e financeira das despesas parlamentares persistidas em PostgreSQL
+              para o estado e ano selecionados, com sinalização explícita de integridade e
+              atualização.
             </p>
           </div>
 
           <div className="overview-header-actions">
             <span
-              className={`storage-badge ${isPreviewStorage ? 'storage-badge--preview' : ''}`}
+              className="storage-badge"
               title={
-                isPreviewStorage
-                  ? 'Armazenamento local SQLite ativo com dados reais da Câmara; schema PostgreSQL 18 disponível em db/schema.sql'
-                  : 'Conectado ao banco PostgreSQL'
+                isOffline
+                  ? 'Banco de dados PostgreSQL indisponível'
+                  : 'Conectado ao banco de dados PostgreSQL'
               }
             >
               <Database size={12} />
