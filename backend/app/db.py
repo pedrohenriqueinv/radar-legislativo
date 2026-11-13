@@ -39,11 +39,15 @@ def _sqlite_enable_foreign_keys(dbapi_connection: Any, _connection_record: Any) 
 
 
 def _resolve_sqlite_runtime_path(cfg: Settings) -> tuple[Path, str]:
-    """Resolve um arquivo SQLite gravável (copiando o snapshot para /tmp na Vercel)."""
+    """Resolve um arquivo SQLite gravável (copiando o snapshot para /tmp em serverless)."""
     sqlite_path = cfg.resolved_preview_sqlite_path
     snapshot_path = cfg.resolved_snapshot_sqlite_path
     is_default_preview = cfg.preview_sqlite_path == "data/radar_preview.sqlite"
-    running_serverless = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+    running_serverless = bool(
+        os.environ.get("VERCEL")
+        or os.environ.get("VERCEL_ENV")
+        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+    )
 
     if running_serverless and not str(sqlite_path).startswith(tempfile.gettempdir()):
         target = Path(tempfile.gettempdir()) / "radar_preview.sqlite"
@@ -56,7 +60,14 @@ def _resolve_sqlite_runtime_path(cfg: Settings) -> tuple[Path, str]:
             return snapshot_path, "SQLite Snapshot (somente leitura)"
         return target, "SQLite Temporário (Vercel /tmp)"
 
-    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        target = Path(tempfile.gettempdir()) / "radar_preview.sqlite"
+        if (not target.exists() or target.stat().st_size == 0) and snapshot_path.exists():
+            shutil.copy2(snapshot_path, target)
+        return target, "SQLite Snapshot (/tmp)"
+
     if (
         is_default_preview
         and (not sqlite_path.exists() or sqlite_path.stat().st_size == 0)

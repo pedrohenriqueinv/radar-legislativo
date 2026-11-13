@@ -163,7 +163,7 @@ Acesse `http://127.0.0.1:5173/` no navegador (em desenvolvimento com HMR, també
 
 ### 4. Deploy na Vercel (Full-Stack Services)
 
-O repositório já vem pré-configurado com Vercel Services em [`vercel.json`](vercel.json), entrypoint FastAPI em [`backend/main.py`](backend/main.py) e snapshot inicial em [`backend/data/radar_snapshot.sqlite`](backend/data/radar_snapshot.sqlite):
+O repositório já vem pré-configurado com Vercel Services em [`vercel.json`](vercel.json), entrypoint FastAPI em [`backend/main.py`](backend/main.py) e snapshot inicial em [`backend/app/radar_snapshot.sqlite`](backend/app/radar_snapshot.sqlite):
 
 1. Importe o repositório `pedrohenriqueinv/radar-legislativo` diretamente na Vercel (Application Preset **Services**, Root Directory `./`).
 2. A Vercel constrói o serviço `frontend` (Vite) e o serviço `backend` (FastAPI em `/api/*`) automaticamente no mesmo domínio.

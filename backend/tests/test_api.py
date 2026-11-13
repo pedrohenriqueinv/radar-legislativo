@@ -116,3 +116,46 @@ def test_vercel_serverless_snapshot_fallback(monkeypatch, tmp_path) -> None:
     assert meta.status_code == 200
     assert len(meta.json()["recortes_carregados"]) >= 1
 
+    for path in (
+        "/api/overview",
+        "/api/deputados",
+        "/api/despesas",
+        "/api/analytics",
+    ):
+        resp = client.get(path, params={"uf": "DF", "ano": 2024})
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert isinstance(payload, (dict, list)) and len(payload) > 0
+
+
+def test_configure_logging_handles_vercel_and_readonly_fs(monkeypatch, tmp_path) -> None:
+    import logging
+    from logging.handlers import RotatingFileHandler
+    from app import logging_config
+
+    logger = logging.getLogger("radar_legislativo")
+    original_handlers = list(logger.handlers)
+    try:
+        logger.handlers.clear()
+        monkeypatch.setenv("VERCEL", "1")
+        monkeypatch.setattr(logging_config, "PROJECT_ROOT", tmp_path)
+        configured = logging_config.configure_logging()
+        assert len(configured.handlers) == 1
+        assert not any(isinstance(h, RotatingFileHandler) for h in configured.handlers)
+        assert not (tmp_path / "logs").exists()
+
+        logger.handlers.clear()
+        for env_key in ("VERCEL", "VERCEL_ENV", "AWS_LAMBDA_FUNCTION_NAME"):
+            monkeypatch.delenv(env_key, raising=False)
+        blocking_file = tmp_path / "readonly_parent"
+        blocking_file.write_text("x", encoding="utf-8")
+        monkeypatch.setattr(logging_config, "PROJECT_ROOT", blocking_file)
+        configured = logging_config.configure_logging()
+        assert len(configured.handlers) == 1
+        assert not any(isinstance(h, RotatingFileHandler) for h in configured.handlers)
+    finally:
+        logger.handlers.clear()
+        for handler in original_handlers:
+            logger.addHandler(handler)
+
+
