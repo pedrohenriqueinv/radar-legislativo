@@ -1,0 +1,27 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+  --color-primary: var(--accent-deep);
+  --color-primary-foreground: var(--ink-on-accent);
+  --color-background: var(--bg-surface);
+  --color-border: var(--border-medium);
+  --color-accent: var(--bg-inset);
+  --color-accent-foreground: var(--ink-primary);
+  --color-secondary: var(--bg-surface-alt);
+  --color-secondary-foreground: var(--ink-primary);
+  --color-ring: var(--accent-deep);
+  --color-input: var(--border-medium);
+  --color-destructive: var(--status-error);
+}
+
+[data-slot='button'] {
+  border: 0 solid var(--border-medium);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+[data-slot='button'][data-variant='outline'] {
+  border-width: 1px;
+}
