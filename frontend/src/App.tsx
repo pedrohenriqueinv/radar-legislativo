@@ -286,6 +286,7 @@ export function App() {
               overview={overview}
               meta={meta}
               loading={loadingSlice}
+              failed={Boolean(dbError)}
               selectedUf={selectedUf}
               selectedAno={selectedAno}
               onExploreClick={() => navigateToSection('visao-geral')}

@@ -6,6 +6,7 @@ interface AnimatedNumberProps {
   value: number;
   kind?: 'brl' | 'brl_whole' | 'int' | 'pct';
   duration?: number;
+  animateOnMount?: boolean;
   className?: string;
 }
 
@@ -19,13 +20,15 @@ export function AnimatedNumber({
   value,
   kind = 'brl',
   duration = 0.72,
+  animateOnMount = true,
   className = '',
 }: AnimatedNumberProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: '-5% 0px' });
   const shouldReduce = useReducedMotion();
-  const [displayVal, setDisplayVal] = useState<number>(shouldReduce ? value : 0);
-  const prevRef = useRef<number>(shouldReduce ? value : 0);
+  const initialValue = shouldReduce || !animateOnMount ? value : 0;
+  const [displayVal, setDisplayVal] = useState(initialValue);
+  const prevRef = useRef(initialValue);
 
   useEffect(() => {
     if (shouldReduce) {
