@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.etl.ceap_source import ARCHIVE_REFRESH_MESSAGE, has_archive_cut
 from app.etl.client import CamaraAPIClient, CamaraAPIError
 from app.etl.loader import (
     create_execution,
@@ -63,6 +64,8 @@ def run_collection(
         raise ValueError(f"Ano fora do intervalo suportado pela CEAP (2008–2100): {ano}")
 
     with session_factory() as session:
+        if has_archive_cut(session, uf_norm, ano):
+            raise ValueError(ARCHIVE_REFRESH_MESSAGE)
         execucao = create_execution(session, uf=uf_norm, ano=ano, origem_api=client.base_url)
         execucao_id = execucao.id
 

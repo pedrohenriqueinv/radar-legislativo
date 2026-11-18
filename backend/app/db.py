@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import logging
 import os
 import shutil
@@ -38,42 +39,47 @@ def _sqlite_enable_foreign_keys(dbapi_connection: Any, _connection_record: Any) 
     cursor.close()
 
 
+def _seed_sqlite(snapshot: Path, target: Path) -> None:
+    if not snapshot.exists() or (target.exists() and target.stat().st_size):
+        return
+    opener = gzip.open if snapshot.suffix == ".gz" else open
+    staged: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as output:
+            staged = Path(output.name)
+            with opener(snapshot, "rb") as source:
+                shutil.copyfileobj(source, output)
+        if not target.exists() or not target.stat().st_size:
+            staged.replace(target)
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
 def _resolve_sqlite_runtime_path(cfg: Settings) -> tuple[Path, str]:
-    """Resolve um arquivo SQLite gravável (copiando o snapshot para /tmp em serverless)."""
     sqlite_path = cfg.resolved_preview_sqlite_path
     snapshot_path = cfg.resolved_snapshot_sqlite_path
     is_default_preview = cfg.preview_sqlite_path == "data/radar_preview.sqlite"
-    running_serverless = bool(
-        os.environ.get("VERCEL")
-        or os.environ.get("VERCEL_ENV")
-        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+    running_serverless = any(
+        os.environ.get(key) for key in ("VERCEL", "VERCEL_ENV", "AWS_LAMBDA_FUNCTION_NAME")
     )
-
-    if running_serverless and not str(sqlite_path).startswith(tempfile.gettempdir()):
-        target = Path(tempfile.gettempdir()) / "radar_preview.sqlite"
-        if (not target.exists() or target.stat().st_size == 0) and snapshot_path.exists():
-            shutil.copy2(snapshot_path, target)
-            return target, "SQLite Snapshot (Vercel /tmp)"
-        if target.exists():
-            return target, "SQLite Snapshot (Vercel /tmp)"
-        if snapshot_path.exists():
-            return snapshot_path, "SQLite Snapshot (somente leitura)"
-        return target, "SQLite Temporário (Vercel /tmp)"
+    temp_root = Path(tempfile.gettempdir())
+    if running_serverless and not sqlite_path.is_relative_to(temp_root):
+        version = snapshot_path.stat().st_size if snapshot_path.exists() else 0
+        target = temp_root / f"radar_preview_{version}.sqlite"
+        _seed_sqlite(snapshot_path, target)
+        return target, "SQLite Snapshot (Vercel /tmp)"
 
     try:
         sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError:
-        target = Path(tempfile.gettempdir()) / "radar_preview.sqlite"
-        if (not target.exists() or target.stat().st_size == 0) and snapshot_path.exists():
-            shutil.copy2(snapshot_path, target)
+        version = snapshot_path.stat().st_size if snapshot_path.exists() else 0
+        target = temp_root / f"radar_preview_{version}.sqlite"
+        _seed_sqlite(snapshot_path, target)
         return target, "SQLite Snapshot (/tmp)"
 
-    if (
-        is_default_preview
-        and (not sqlite_path.exists() or sqlite_path.stat().st_size == 0)
-        and snapshot_path.exists()
-    ):
-        shutil.copy2(snapshot_path, sqlite_path)
+    if is_default_preview:
+        _seed_sqlite(snapshot_path, sqlite_path)
     return sqlite_path, f"SQLite local (prévia): {sqlite_path.name}"
 
 

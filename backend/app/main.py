@@ -16,6 +16,7 @@ from app.db import (
     create_database_context,
     init_schema,
 )
+from app.etl.ceap_source import ARCHIVE_REFRESH_MESSAGE, has_archive_cut
 from app.etl.client import CamaraAPIClient
 from app.etl.pipeline import run_collection
 from app.etl.transform import UFS_BRASIL
@@ -320,6 +321,9 @@ def create_app(
             raise HTTPException(status_code=400, detail=f"UF inválida: {payload.uf}")
 
         ctx = _ensure_db(state)
+        with ctx.session_factory() as session:
+            if has_archive_cut(session, uf_norm, payload.ano):
+                raise HTTPException(status_code=409, detail=ARCHIVE_REFRESH_MESSAGE)
         key = (uf_norm, payload.ano)
 
         with state.lock:

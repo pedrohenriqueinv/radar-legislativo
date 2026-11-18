@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     test_database_url: str = ""
     radar_storage_mode: Literal["postgres", "preview", "auto"] = "postgres"
     preview_sqlite_path: str = "data/radar_preview.sqlite"
-    snapshot_sqlite_path: str = "app/radar_snapshot.sqlite"
+    snapshot_sqlite_path: str = "app/radar_snapshot.sqlite.gz"
 
     camara_api_base_url: str = "https://dadosabertos.camara.leg.br/api/v2"
     camara_http_timeout_seconds: float = 15.0
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         raw = Path(self.snapshot_sqlite_path)
         if raw.is_absolute():
             return raw
-        package_candidate = Path(__file__).resolve().parent / "radar_snapshot.sqlite"
+        package_candidate = Path(__file__).resolve().parent / "radar_snapshot.sqlite.gz"
         backend_candidate = BACKEND_DIR / raw
         repo_candidate = PROJECT_ROOT / raw
         for candidate in (backend_candidate, package_candidate, repo_candidate):

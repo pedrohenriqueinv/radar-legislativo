@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session
 
+from app.etl.ceap_source import ARCHIVE_INDEX, archive_url
 from app.etl.transform import UFS_BRASIL
 from app.models import (
     Deputado,
@@ -170,8 +171,11 @@ class RadarRepository:
         current_year = datetime.now(timezone.utc).year
         anos_suportados = list(range(current_year, 2018, -1))
         if recortes_carregados:
-            default_uf = recortes_carregados[0]["uf"]
             default_ano = recortes_carregados[0]["ano"]
+            default_uf = next(
+                (row["uf"] for row in recortes_carregados if row["ano"] == default_ano and row["uf"] == "DF"),
+                recortes_carregados[0]["uf"],
+            )
         else:
             default_uf = "DF"
             default_ano = 2025 if current_year >= 2025 else current_year
@@ -294,7 +298,14 @@ class RadarRepository:
             dias_desde = max(0, delta.days)
             is_stale = dias_desde >= self.stale_threshold_days
 
-        if not has_data:
+        from_archive = bool(ultima_exec and ultima_exec.origem_api == archive_url(ano))
+        if from_archive:
+            nota = (
+                f"Arquivo anual oficial da CEAP para {uf_nome} ({uf_norm}) em {ano}. "
+                "Inclui parlamentares com despesas registradas no recorte. "
+                "O valor líquido e o sinal dos estornos seguem o arquivo da Câmara."
+            )
+        elif not has_data:
             nota = (
                 f"Ainda não há dados coletados para {uf_nome} ({uf_norm}) em {ano}. "
                 "Acione a coleta oficial pela API da Câmara dos Deputados para carregar este recorte."
@@ -336,7 +347,7 @@ class RadarRepository:
             categorias_resumo=categorias_resumo,
             serie_mensal=serie_mensal,
             ultima_execucao=_exec_to_schema(ultima_exec) if ultima_exec else None,
-            fonte_oficial_url="https://dadosabertos.camara.leg.br/swagger/api.html",
+            fonte_oficial_url=ARCHIVE_INDEX if from_archive else "https://dadosabertos.camara.leg.br/swagger/api.html",
             nota_integridade=nota,
         )
 

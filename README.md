@@ -18,6 +18,18 @@ Aplicação completa de Engenharia de Dados e visualização pública para explo
 
 ---
 
+## Cobertura das despesas de 2025
+
+O snapshot SQL do site cobre os 26 estados e o Distrito Federal em 2025. A carga acrescentou 203.775 lançamentos de 25 estados a partir do [arquivo anual oficial da CEAP](https://www.camara.leg.br/cotas/Ano-2025.csv.zip), com o cadastro de identidade dos [Dados Abertos da Câmara](https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv). Os recortes DF/2024, DF/2025 e AP/2025 vieram das coletas da API já existentes. As duas extrações têm fontes e datas distintas, registradas no histórico da coleta.
+
+A importação preserva os valores líquidos publicados. Ela exclui do recorte estadual as linhas de lideranças sem UF e valida o número de lançamentos, o total líquido e as glosas em centavos por UF e mês. As identidades são verificadas pelo identificador oficial do deputado. O SHA-256 do arquivo importado foi `ae3deba04141d28bdde94def1f499f234f423a44daa25d66225d6578af7f89e5`.
+
+```sh
+python backend/import_ceap_archive.py caminho/para/copia.sqlite Ano-2025.csv.zip deputados.csv --ano 2025
+```
+
+O importador adiciona recortes ausentes em uma cópia SQLite e mantém os recortes preexistentes. O servidor usa o snapshot compactado para inicializar um banco de prévia novo. Um banco local existente pode ser mantido e consultado pelo seu caminho explícito.
+
 ## Arquitetura do sistema
 
 ```text
@@ -163,7 +175,7 @@ Acesse `http://127.0.0.1:5173/` no navegador (em desenvolvimento com HMR, també
 
 ### 4. Deploy na Vercel (Full-Stack Services)
 
-O repositório já vem pré-configurado com Vercel Services em [`vercel.json`](vercel.json), entrypoint FastAPI em [`backend/main.py`](backend/main.py) e snapshot inicial em [`backend/app/radar_snapshot.sqlite`](backend/app/radar_snapshot.sqlite):
+O repositório já vem pré-configurado com Vercel Services em [`vercel.json`](vercel.json), entrypoint FastAPI em [`backend/main.py`](backend/main.py) e snapshot inicial em [`backend/app/radar_snapshot.sqlite.gz`](backend/app/radar_snapshot.sqlite.gz):
 
 1. Importe o repositório `pedrohenriqueinv/radar-legislativo` diretamente na Vercel (Application Preset **Services**, Root Directory `./`).
 2. A Vercel constrói o serviço `frontend` (Vite) e o serviço `backend` (FastAPI em `/api/*`) automaticamente no mesmo domínio.

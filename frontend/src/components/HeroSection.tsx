@@ -159,6 +159,8 @@ export function HeroSection({
 
   const current = overview?.uf === selectedUf && overview.ano === selectedAno ? overview : null;
 
+  const fromArchive = current?.ultima_execucao?.origem_api.endsWith('.csv.zip');
+
   return (
     <section ref={heroRef} id="topo" className="radar-hero" aria-labelledby="radar-hero-title">
       <div className="radar-hero__cover">
@@ -213,8 +215,10 @@ export function HeroSection({
         </a>
         <MethodPopover
           title="Nota metodológica dos valores"
-          body="Os totais mensais somam o valor líquido dos documentos fiscais da CEAP após eventuais glosas administrativas. Créditos e bilhetes aéreos compensados preservam o sinal negativo original."
-          sourceLabel="Câmara dos Deputados · API Dados Abertos v2"
+          body={fromArchive
+            ? 'Os totais mensais somam o valor líquido publicado no arquivo anual da CEAP. O recorte usa a UF e o mês de competência informados pela Câmara, preservando o sinal dos estornos.'
+            : 'Os totais mensais somam o valor líquido dos documentos fiscais da CEAP após eventuais glosas administrativas. Créditos e bilhetes aéreos compensados preservam o sinal negativo original.'}
+          sourceLabel={fromArchive ? 'Câmara dos Deputados · Arquivo anual da CEAP' : 'Câmara dos Deputados · API Dados Abertos v2'}
         />
       </div>
     </section>

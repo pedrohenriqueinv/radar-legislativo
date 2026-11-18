@@ -64,6 +64,11 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 <strong>Um gasto registrado não representa irregularidade ou ilícito.</strong> Os
                 limites mensais variam por UF conforme distância de Brasília e exercício do mandato.
               </p>
+              <p style={{ margin: '0 0 10px', color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
+                Os recortes importados do arquivo anual da Câmara mantêm o valor líquido publicado,
+                inclusive estornos. Os parlamentares desses recortes são os que têm lançamentos no
+                arquivo. Registros de lideranças sem UF ficam fora dos totais por estado.
+              </p>
               <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
                 <strong>Decisão técnica verificada na API:</strong> endpoints de despesas fora de
                 SIGEPA retornam <code className="mono">valorLiquido</code> negativo mesmo com documento positivo;
@@ -82,7 +87,7 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 Ambiente atual e documentação oficial
               </h3>
               <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-                Banco ativo: {health?.database_connected === false ? 'PostgreSQL indisponível' : 'PostgreSQL'} · Recorte atual: {overview?.uf ?? '—'}/{overview?.ano ?? '—'}
+                Banco ativo: {health?.database_connected ? health.storage_label : "Indisponível"} · Recorte atual: {overview?.uf ?? "-"} / {overview?.ano ?? "-"}
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: '0.88rem' }}>

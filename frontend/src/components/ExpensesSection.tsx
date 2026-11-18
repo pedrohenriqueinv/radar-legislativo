@@ -375,10 +375,10 @@ export function ExpensesSection({
                           href={row.fonte_url}
                           target="_blank"
                           rel="noreferrer"
-                          title="Consultar endpoint oficial do parlamentar na API v2"
+                          title="Consultar fonte oficial do registro"
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
-                          API
+                          {row.fonte_url.endsWith('.csv.zip') ? 'Arquivo CEAP' : 'API'}
                           <ExternalLink size={12} />
                         </a>
                       </td>
