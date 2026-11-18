@@ -140,6 +140,17 @@ a:hover {
   z-index: 60;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
+  transition: transform 240ms var(--ease-out-expo), opacity 180ms ease;
+}
+
+.site-header-wrap[data-scroll-hidden='true']:not(:has(:focus-visible)) {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-header-wrap:has(:focus-visible) {
+  transition: none;
 }
 
 .main-nav-bar {
@@ -1886,10 +1897,6 @@ a:hover {
 }
 
 @media (max-width: 768px) {
-  .site-header-wrap {
-    position: static;
-  }
-
   .main-nav-inner {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto auto;

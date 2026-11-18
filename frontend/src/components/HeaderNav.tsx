@@ -27,6 +27,34 @@ export function HeaderNav({
   onSearchDataClick,
 }: HeaderNavProps) {
   const [activeSection, setActiveSection] = useState<string>('visao-geral');
+  const [scrollHidden, setScrollHidden] = useState(false);
+
+  useEffect(() => {
+    const threshold = 12;
+    let previousY = Math.max(0, window.scrollY);
+    let travel = 0;
+    let hidden = false;
+
+    const onScroll = () => {
+      const y = Math.max(0, window.scrollY);
+      const delta = y - previousY;
+      previousY = y;
+
+      if (y <= threshold || delta * travel < 0) travel = 0;
+      if (y > threshold) travel += delta;
+      if (y > threshold && Math.abs(travel) < threshold) return;
+
+      const nextHidden = y > threshold && travel > 0;
+      travel = 0;
+      if (nextHidden !== hidden) {
+        hidden = nextHidden;
+        setScrollHidden(hidden);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
@@ -56,7 +84,11 @@ export function HeaderNav({
   }, []);
 
   return (
-    <header className="site-header-wrap" aria-label="Navegação principal do Radar Legislativo">
+    <header
+      className="site-header-wrap"
+      data-scroll-hidden={scrollHidden}
+      aria-label="Navegação principal do Radar Legislativo"
+    >
       <div className="main-nav-bar">
         <div className="container main-nav-inner">
           <a
