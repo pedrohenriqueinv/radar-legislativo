@@ -1,8 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowLeft, Building2, Download, ExternalLink, FileText, UserRound } from 'lucide-react';
+import { memo, startTransition, useCallback, useEffect, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import {
+  ArrowLeft,
+  Building2,
+  Download,
+  ExternalLink,
+  FileText,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { radarApi } from '../services/api';
-import type { DeputadoDetailResponse, DespesasPageResponse } from '../types/api';
+import type {
+  DeputadoCardOut,
+  DeputadoDetailResponse,
+  DespesaOut,
+  DespesasPageResponse,
+} from '../types/api';
 import {
   formatBRL,
   formatBRLCompact,
@@ -13,26 +26,68 @@ import {
   getMonthLabel,
   shortenCategory,
 } from '../utils/format';
+import { CeapUsageMeter } from './CeapUsageMeter';
 import { AnimatedHBar } from './motion/InViewBar';
 import { AnimatedNumber } from './motion/AnimatedNumber';
 import { Magnet } from './motion/Magnet';
+import './DeputyDetailView.css';
 
 const CONTRA_EASE: [number, number, number, number] = [0.48, 0.05, 0.35, 0.99];
+const INSTANT_TRANSITION = { duration: 0 };
 
 interface DeputyDetailViewProps {
   deputadoId: number;
   ano: number;
   ufContext: string;
   onBack: () => void;
+  /** Optional slice peer list passed from App.tsx to compute exact rank & slice average without refetching */
+  deputadosInSlice?: DeputadoCardOut[];
 }
+
+const ProfileExpenseRow = memo(function ProfileExpenseRow({ item }: { item: DespesaOut }) {
+  return (
+    <tr>
+      <td className="tabular">{formatDateBR(item.data_documento)}</td>
+      <td>{shortenCategory(item.tipo_despesa)}</td>
+      <td>
+        <div style={{ color: 'var(--ink-primary)' }}>{item.nome_fornecedor}</div>
+        <div className="mono" style={{ fontSize: '0.74rem', color: 'var(--ink-muted)' }}>
+          {formatDocumentTaxId(item.cnpj_cpf_fornecedor)}
+        </div>
+      </td>
+      <td className="num-col mono">
+        {formatBRL(item.valor_liquido)}
+        {item.valor_liquido < 0 ? <span className="credit-badge">Crédito/Estorno</span> : null}
+      </td>
+      <td>
+        {item.url_documento ? (
+          <a
+            href={item.url_documento}
+            target="_blank"
+            rel="noreferrer"
+            className="profile-doc-link"
+          >
+            <FileText size={13} />
+            NF {item.num_documento ?? 'PDF'}
+          </a>
+        ) : (
+          <span style={{ color: 'var(--ink-dim)' }}>Não anexado</span>
+        )}
+      </td>
+    </tr>
+  );
+});
 
 export function DeputyDetailView({
   deputadoId,
   ano,
   ufContext,
   onBack,
+  deputadosInSlice,
 }: DeputyDetailViewProps) {
+  const shouldReduce = useReducedMotion();
   const [detail, setDetail] = useState<DeputadoDetailResponse | null>(null);
+  const [fallbackPeers, setFallbackPeers] = useState<DeputadoCardOut[] | null>(null);
   const [expensesPage, setExpensesPage] = useState<DespesasPageResponse | null>(null);
   const [page, setPage] = useState(1);
   const [catFilter, setCatFilter] = useState('');
@@ -40,17 +95,26 @@ export function DeputyDetailView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
 
+  const hasPassedPeers = Boolean(deputadosInSlice && deputadosInSlice.length > 0);
+
   useEffect(() => {
     let active = true;
     setLoading(true);
     setErrorMsg(null);
     setImgFailed(false);
+    setCatFilter('');
+    setPage(1);
 
-    radarApi
-      .getDeputadoDetail(deputadoId, { ano, uf: ufContext })
-      .then((res) => {
+    const detailPromise = radarApi.getDeputadoDetail(deputadoId, { ano, uf: ufContext });
+    const peersPromise = hasPassedPeers
+      ? Promise.resolve<DeputadoCardOut[] | null>(null)
+      : radarApi.getDeputados({ uf: ufContext, ano }).catch(() => null);
+
+    Promise.all([detailPromise, peersPromise])
+      .then(([res, peers]) => {
         if (!active) return;
         setDetail(res);
+        if (peers) setFallbackPeers(peers);
       })
       .catch((err) => {
         if (!active) return;
@@ -63,7 +127,7 @@ export function DeputyDetailView({
     return () => {
       active = false;
     };
-  }, [deputadoId, ano, ufContext]);
+  }, [deputadoId, ano, ufContext, hasPassedPeers]);
 
   useEffect(() => {
     let active = true;
@@ -87,15 +151,73 @@ export function DeputyDetailView({
     };
   }, [deputadoId, ano, catFilter, page]);
 
+  const effectivePeers = useMemo(() => {
+    if (deputadosInSlice && deputadosInSlice.length > 0) return deputadosInSlice;
+    return fallbackPeers ?? [];
+  }, [deputadosInSlice, fallbackPeers]);
+
+  const peerStats = useMemo(() => {
+    if (effectivePeers.length === 0) {
+      return {
+        rank: null as number | null,
+        totalInSlice: null as number | null,
+        sliceAverage: null as number | null,
+        percentualNoRecorte: null as number | null,
+      };
+    }
+    const sorted = [...effectivePeers].sort((a, b) => b.total_liquido - a.total_liquido);
+    let sum = 0;
+    let rank: number | null = null;
+    let pct: number | null = null;
+    for (let i = 0; i < sorted.length; i += 1) {
+      const p = sorted[i];
+      sum += p.total_liquido;
+      if (p.id === deputadoId) {
+        rank = i + 1;
+        pct = p.percentual_no_recorte;
+      }
+    }
+    return {
+      rank,
+      totalInSlice: sorted.length,
+      sliceAverage: sorted.length > 0 ? sum / sorted.length : null,
+      percentualNoRecorte: pct,
+    };
+  }, [effectivePeers, deputadoId]);
+
   const maxCat = useMemo(
     () => Math.max(...(detail?.categorias ?? []).map((c) => Math.abs(c.total_liquido)), 1),
     [detail]
   );
 
-  const maxMes = useMemo(
-    () => Math.max(...(detail?.serie_mensal ?? []).map((m) => Math.abs(m.total_liquido)), 1),
-    [detail]
-  );
+  const monthlyStats = useMemo(() => {
+    const serie = detail?.serie_mensal ?? [];
+    let maxMes = 1;
+    let sumAtivos = 0;
+    let countAtivos = 0;
+
+    for (const m of serie) {
+      const abs = Math.abs(m.total_liquido);
+      if (abs > maxMes) maxMes = abs;
+      if (m.qtd_lancamentos > 0) {
+        sumAtivos += m.total_liquido;
+        countAtivos += 1;
+      }
+    }
+
+    const avgProfile = countAtivos > 0 ? sumAtivos / countAtivos : 0;
+    const avgProfileRatio =
+      avgProfile > 0 ? Math.min(0.95, Math.max(0.06, avgProfile / maxMes)) : 0;
+
+    return { maxMes, avgProfile, avgProfileRatio };
+  }, [detail]);
+
+  const handleSelectCategory = useCallback((categoria: string | null) => {
+    startTransition(() => {
+      setCatFilter(categoria ?? '');
+      setPage(1);
+    });
+  }, []);
 
   if (loading && !detail) {
     return (
@@ -128,27 +250,25 @@ export function DeputyDetailView({
     );
   }
 
+  const effectiveUf = detail.uf_referencia ?? detail.uf_atual ?? ufContext;
+
   return (
-    <section className="container profile-shell" aria-label={`Perfil de ${detail.nome_parlamentar}`}>
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 18,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.86rem', color: 'var(--ink-muted)' }}>
+    <section
+      className="container profile-shell"
+      aria-label={`Perfil de ${detail.nome_parlamentar}`}
+    >
+      <div className="profile-topbar">
+        <div className="profile-breadcrumb">
           <button type="button" className="btn btn-sm" onClick={onBack}>
             <ArrowLeft size={15} />
             Voltar ao recorte
           </button>
-          <span>/</span>
-          <span>{detail.uf_referencia ?? detail.uf_atual ?? ufContext} · {detail.ano_referencia}</span>
-          <span>/</span>
-          <strong style={{ color: 'var(--ink-primary)' }}>{detail.nome_parlamentar}</strong>
+          <span aria-hidden="true">/</span>
+          <span>
+            {effectiveUf} · {detail.ano_referencia}
+          </span>
+          <span aria-hidden="true">/</span>
+          <strong className="profile-breadcrumb__current">{detail.nome_parlamentar}</strong>
         </div>
 
         <Magnet magnetStrength={5}>
@@ -174,88 +294,129 @@ export function DeputyDetailView({
               onError={() => setImgFailed(true)}
             />
           ) : (
-            <div className="profile-photo" style={{ display: 'grid', placeItems: 'center' }}>
+            <div className="profile-photo profile-photo-placeholder" aria-hidden="true">
               <UserRound size={32} color="var(--ink-muted)" />
             </div>
           )}
 
-          <div>
-            <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 3vw, 2.3rem)', lineHeight: 1.1 }}>
-              {detail.nome_parlamentar}
-            </h1>
-            {detail.nome_civil && (
-              <p style={{ margin: '4px 0 6px', color: 'var(--ink-muted)', fontSize: '0.9rem' }}>
-                Nome civil: {detail.nome_civil}
-              </p>
-            )}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: '0.86rem', color: 'var(--ink-secondary)' }}>
-              <span>Partido: <strong>{detail.partido_atual ?? 'N/D'}</strong></span>
-              <span>·</span>
-              <span>UF: <strong>{detail.uf_atual ?? detail.uf_referencia ?? 'N/D'}</strong></span>
-              {detail.situacao_atual && (
+          <div className="profile-identity-body">
+            <h1 className="profile-heading-h1">{detail.nome_parlamentar}</h1>
+            {detail.nome_civil ? (
+              <p className="profile-civil-name">Nome civil: {detail.nome_civil}</p>
+            ) : null}
+            <div className="profile-meta-list">
+              <span>
+                Partido: <strong>{detail.partido_atual ?? 'N/D'}</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                UF: <strong>{detail.uf_atual ?? detail.uf_referencia ?? 'N/D'}</strong>
+              </span>
+              {detail.situacao_atual ? (
                 <>
-                  <span>·</span>
-                  <span>Situação: <strong>{detail.situacao_atual}</strong></span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    Situação: <strong>{detail.situacao_atual}</strong>
+                  </span>
                 </>
-              )}
-              {detail.condicao_eleitoral && (
+              ) : null}
+              {detail.condicao_eleitoral ? (
                 <>
-                  <span>·</span>
-                  <span>Condição: <strong>{detail.condicao_eleitoral}</strong></span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    Condição: <strong>{detail.condicao_eleitoral}</strong>
+                  </span>
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
-        <a
-          href={detail.fonte_oficial_url}
-          target="_blank"
-          rel="noreferrer"
-          className="btn btn-sm"
-        >
-          JSON oficial da API
-          <ExternalLink size={13} />
-        </a>
+        <div className="profile-banner-actions">
+          <a
+            href={detail.fonte_oficial_url}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-sm"
+          >
+            JSON oficial da API
+            <ExternalLink size={13} />
+          </a>
+        </div>
       </div>
 
       <div className="kpi-ledger">
         <div className="kpi-cell">
           <span className="kpi-label">Total líquido ({detail.ano_referencia})</span>
           <span className="kpi-value tabular">
-            <AnimatedNumber value={detail.total_liquido} kind="brl" duration={0.68} />
+            <AnimatedNumber
+              value={detail.total_liquido}
+              kind="brl"
+              duration={0.68}
+              animateOnMount={false}
+            />
           </span>
           <span className="kpi-caption">Despesas consolidadas no ano selecionado</span>
         </div>
         <div className="kpi-cell">
           <span className="kpi-label">Despesas registradas</span>
           <span className="kpi-value tabular">
-            <AnimatedNumber value={detail.qtd_despesas} kind="int" duration={0.58} />
+            <AnimatedNumber
+              value={detail.qtd_despesas}
+              kind="int"
+              duration={0.58}
+              animateOnMount={false}
+            />
           </span>
           <span className="kpi-caption">Documentos fiscais e bilhetes SIGEPA</span>
         </div>
         <div className="kpi-cell">
           <span className="kpi-label">Glosas administrativas</span>
           <span className="kpi-value tabular">
-            <AnimatedNumber value={detail.total_glosas} kind="brl" duration={0.58} />
+            <AnimatedNumber
+              value={detail.total_glosas}
+              kind="brl"
+              duration={0.58}
+              animateOnMount={false}
+            />
           </span>
           <span className="kpi-caption">Parcelas não ressarcidas pela Câmara</span>
         </div>
         <div className="kpi-cell">
           <span className="kpi-label">Categorias utilizadas</span>
           <span className="kpi-value tabular">
-            <AnimatedNumber value={detail.categorias.length} kind="int" duration={0.48} />
+            <AnimatedNumber
+              value={detail.categorias.length}
+              kind="int"
+              duration={0.48}
+              animateOnMount={false}
+            />
           </span>
           <span className="kpi-caption">Entre as rubricas da cota CEAP</span>
         </div>
       </div>
 
+      {/* Parte B.2: Multi-segmented CEAP Quota Usage Meter with rank pill & interactive legend */}
+      <CeapUsageMeter
+        variant="detailed"
+        totalLiquido={detail.total_liquido}
+        uf={effectiveUf}
+        ano={detail.ano_referencia}
+        categorias={detail.categorias}
+        rank={peerStats.rank}
+        totalInSlice={peerStats.totalInSlice}
+        percentualNoRecorte={peerStats.percentualNoRecorte}
+        sliceAverage={peerStats.sliceAverage}
+        selectedCategory={catFilter || null}
+        onSelectCategory={handleSelectCategory}
+      />
+
       <div className="profile-grid-2">
         <div className="panel-card">
-          <h2 style={{ margin: '0 0 6px', fontSize: '1.1rem' }}>
+          <h2 className="profile-panel-title">
             Despesas por categoria ({detail.ano_referencia})
           </h2>
-          <p style={{ margin: '0 0 16px', fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+          <p className="profile-panel-sub">
             Valores líquidos em R$ · Fonte: API Dados Abertos da Câmara
           </p>
           {detail.categorias.length === 0 ? (
@@ -268,7 +429,7 @@ export function DeputyDetailView({
                     <span className="hbar-name" title={c.categoria}>
                       {shortenCategory(c.categoria)}
                     </span>
-                    <span className="hbar-values tabular">
+                    <span className="hbar-values mono tabular">
                       {formatBRL(c.total_liquido)} ({formatPct(c.percentual)})
                     </span>
                   </div>
@@ -283,71 +444,66 @@ export function DeputyDetailView({
         </div>
 
         <div className="panel-card">
-          <h2 style={{ margin: '0 0 6px', fontSize: '1.1rem' }}>
-            Evolução mensal ({detail.ano_referencia})
-          </h2>
-          <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+          <h2 className="profile-panel-title">Evolução mensal ({detail.ano_referencia})</h2>
+          <p className="profile-panel-sub">
             Valores líquidos por mês de competência · Valores em R$
           </p>
-          {(() => {
-            const ativos = detail.serie_mensal.filter((m) => m.qtd_lancamentos > 0);
-            const avgProfile =
-              ativos.length > 0
-                ? ativos.reduce((acc, m) => acc + m.total_liquido, 0) / ativos.length
-                : 0;
-            const avgProfileRatio =
-              avgProfile > 0 ? Math.min(0.95, Math.max(0.06, avgProfile / maxMes)) : 0;
-
-            return (
-              <div className="hero-bars-stage">
-                {avgProfile > 0 && (
-                  <div
-                    className="avg-ref-line"
-                    style={{ bottom: `calc(24px + ${avgProfileRatio.toFixed(4)} * (100% - 46px))` }}
-                    aria-hidden="true"
-                  >
-                    <span className="avg-ref-badge tabular">
-                      AVG · {formatBRLCompact(avgProfile)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="hero-bars-grid" style={{ height: 152 }}>
-                  {detail.serie_mensal.map((m, idx) => {
-                    const h =
-                      m.qtd_lancamentos > 0
-                        ? Math.max(8, Math.round((Math.abs(m.total_liquido) / maxMes) * 100))
-                        : 4;
-                    return (
-                      <div
-                        key={m.mes}
-                        className={`hero-bar-col ${m.qtd_lancamentos === 0 ? 'hero-bar-col--empty' : ''}`}
-                        title={`${getMonthLabel(m.mes)}: ${formatBRL(m.total_liquido)} (${m.qtd_lancamentos} lançamentos)`}
-                      >
-                        <span className="hero-bar-track">
-                          <motion.span
-                            key={`${detail.id}-${detail.ano_referencia}-m-${m.mes}`}
-                            className="hero-bar-fill"
-                            initial={{ scaleY: 0 }}
-                            animate={{ scaleY: 1 }}
-                            transition={{ duration: 0.48, delay: idx * 0.03, ease: CONTRA_EASE }}
-                            style={{ height: `${h}%` }}
-                          />
-                        </span>
-                        <span className="hero-bar-label">{m.mes_nome}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+          <div className="hero-bars-stage">
+            {monthlyStats.avgProfile > 0 ? (
+              <div
+                className="avg-ref-line"
+                style={{
+                  bottom: `calc(24px + ${monthlyStats.avgProfileRatio.toFixed(4)} * (100% - 46px))`,
+                }}
+                aria-hidden="true"
+              >
+                <span className="avg-ref-badge tabular">
+                  AVG · {formatBRLCompact(monthlyStats.avgProfile)}
+                </span>
               </div>
-            );
-          })()}
+            ) : null}
+
+            <div className="hero-bars-grid" style={{ height: 152 }}>
+              {detail.serie_mensal.map((m, idx) => {
+                const h =
+                  m.qtd_lancamentos > 0
+                    ? Math.max(
+                        8,
+                        Math.round((Math.abs(m.total_liquido) / monthlyStats.maxMes) * 100)
+                      )
+                    : 4;
+                return (
+                  <div
+                    key={m.mes}
+                    className={`hero-bar-col ${m.qtd_lancamentos === 0 ? 'hero-bar-col--empty' : ''}`}
+                    title={`${getMonthLabel(m.mes)}: ${formatBRL(m.total_liquido)} (${m.qtd_lancamentos} lançamentos)`}
+                  >
+                    <span className="hero-bar-track">
+                      <motion.span
+                        key={`${detail.id}-${detail.ano_referencia}-m-${m.mes}`}
+                        className="hero-bar-fill"
+                        initial={shouldReduce ? false : { scaleY: 0 }}
+                        animate={{ scaleY: 1 }}
+                        transition={
+                          shouldReduce
+                            ? INSTANT_TRANSITION
+                            : { duration: 0.48, delay: idx * 0.03, ease: CONTRA_EASE }
+                        }
+                        style={{ height: `${h}%` }}
+                      />
+                    </span>
+                    <span className="hero-bar-label">{m.mes_nome}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="profile-grid-2">
         <div className="panel-card">
-          <h2 style={{ margin: '0 0 14px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="profile-panel-title profile-panel-title--icon">
             <Building2 size={17} color="var(--accent-bright)" />
             Principais fornecedores ({detail.ano_referencia})
           </h2>
@@ -375,7 +531,7 @@ export function DeputyDetailView({
                         </div>
                       </td>
                       <td className="num-col">{formatInt(f.qtd_lancamentos)}</td>
-                      <td className="num-col">{formatBRL(f.total_liquido)}</td>
+                      <td className="num-col mono">{formatBRL(f.total_liquido)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -385,7 +541,7 @@ export function DeputyDetailView({
         </div>
 
         <div className="panel-card">
-          <h2 style={{ margin: '0 0 14px', fontSize: '1.1rem' }}>
+          <h2 className="profile-panel-title" style={{ marginBottom: 14 }}>
             Histórico de mandatos e alterações (/historico)
           </h2>
           {detail.historico_mandatos.length === 0 ? (
@@ -410,11 +566,11 @@ export function DeputyDetailView({
                       </td>
                       <td>
                         <div style={{ color: 'var(--ink-primary)' }}>{h.situacao ?? '—'}</div>
-                        {h.descricao_status && (
+                        {h.descricao_status ? (
                           <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
                             {h.descricao_status}
                           </div>
-                        )}
+                        ) : null}
                       </td>
                       <td className="tabular">{formatDateBR(h.data_hora_evento)}</td>
                     </tr>
@@ -427,34 +583,34 @@ export function DeputyDetailView({
       </div>
 
       <div className="panel-card" style={{ marginTop: 24 }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
+        <div className="profile-expenses-head">
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>
+            <h2 className="profile-panel-title">
               Lançamentos individuais de {detail.nome_parlamentar} ({detail.ano_referencia})
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+            <p className="profile-panel-sub" style={{ marginBottom: 0 }}>
               Inclui acesso ao documento fiscal oficial (DANFE/PDF) quando disponibilizado pela Câmara.
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <div className="profile-expenses-controls">
+            {catFilter ? (
+              <button
+                type="button"
+                className="profile-cat-filter-pill"
+                onClick={() => handleSelectCategory(null)}
+                title="Remover filtro de categoria"
+              >
+                {shortenCategory(catFilter)}
+                <X size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+
             <select
               className="filter-select"
               value={catFilter}
               aria-label="Filtrar lançamentos por categoria"
-              onChange={(e) => {
-                setCatFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => handleSelectCategory(e.target.value || null)}
             >
               <option value="">Todas as categorias</option>
               {detail.categorias.map((c) => (
@@ -491,58 +647,31 @@ export function DeputyDetailView({
             </thead>
             <tbody>
               {(expensesPage?.items ?? []).map((item) => (
-                <tr key={item.id}>
-                  <td className="tabular">{formatDateBR(item.data_documento)}</td>
-                  <td>{shortenCategory(item.tipo_despesa)}</td>
-                  <td>
-                    <div style={{ color: 'var(--ink-primary)' }}>{item.nome_fornecedor}</div>
-                    <div className="mono" style={{ fontSize: '0.74rem', color: 'var(--ink-muted)' }}>
-                      {formatDocumentTaxId(item.cnpj_cpf_fornecedor)}
-                    </div>
-                  </td>
-                  <td className="num-col">
-                    {formatBRL(item.valor_liquido)}
-                    {item.valor_liquido < 0 && <span className="credit-badge">Crédito/Estorno</span>}
-                  </td>
-                  <td>
-                    {item.url_documento ? (
-                      <a
-                        href={item.url_documento}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <FileText size={13} />
-                        NF {item.num_documento ?? 'PDF'}
-                      </a>
-                    ) : (
-                      <span style={{ color: 'var(--ink-dim)' }}>Não anexado</span>
-                    )}
-                  </td>
-                </tr>
+                <ProfileExpenseRow key={item.id} item={item} />
               ))}
-              {expensesPage && expensesPage.items.length === 0 && (
+              {expensesPage && expensesPage.items.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>
                     Nenhum lançamento encontrado com esse filtro.
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>
 
-        {expensesPage && expensesPage.total_pages > 1 && (
+        {expensesPage && expensesPage.total_pages > 1 ? (
           <div className="pagination-bar">
             <span>
-              Página {expensesPage.page} de {expensesPage.total_pages} · {formatInt(expensesPage.total)} registros
+              Página {expensesPage.page} de {expensesPage.total_pages} ·{' '}
+              {formatInt(expensesPage.total)} registros
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
                 className="btn btn-sm"
                 disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => startTransition(() => setPage((p) => Math.max(1, p - 1)))}
               >
                 Anterior
               </button>
@@ -550,13 +679,13 @@ export function DeputyDetailView({
                 type="button"
                 className="btn btn-sm"
                 disabled={page >= expensesPage.total_pages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => startTransition(() => setPage((p) => p + 1))}
               >
                 Próxima
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

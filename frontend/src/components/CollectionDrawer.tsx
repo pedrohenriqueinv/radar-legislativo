@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { memo, useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { RefreshCw, X } from 'lucide-react';
 import type { MetaResponse } from '../types/api';
 
@@ -11,22 +11,27 @@ interface CollectionDrawerProps {
   defaultUf: string;
   defaultAno: number;
   submitting: boolean;
+  storageLabel?: string | null;
   onClose: () => void;
   onSubmit: (uf: string, ano: number, maxDeputados: number | null) => void;
 }
 
-export function CollectionDrawer({
+export const CollectionDrawer = memo(function CollectionDrawer({
   open,
   meta,
   defaultUf,
   defaultAno,
   submitting,
+  storageLabel,
   onClose,
   onSubmit,
 }: CollectionDrawerProps) {
   const [uf, setUf] = useState(defaultUf);
   const [ano, setAno] = useState(defaultAno);
   const [maxDeps, setMaxDeps] = useState<string>('');
+  const shouldReduce = useReducedMotion();
+
+  const resolvedStorage = storageLabel || meta?.storage_label || 'banco relacional';
 
   useEffect(() => {
     if (open) {
@@ -46,7 +51,7 @@ export function CollectionDrawer({
 
   return (
     <AnimatePresence>
-      {open && (
+      {open ? (
         <motion.div
           className="modal-backdrop"
           role="dialog"
@@ -55,20 +60,31 @@ export function CollectionDrawer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={shouldReduce ? { duration: 0.01 } : { duration: 0.2 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
         >
           <motion.div
             className="modal-panel"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            initial={shouldReduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: CONTRA_EASE }}
+            exit={shouldReduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+            transition={shouldReduce ? { duration: 0.01 } : { duration: 0.24, ease: CONTRA_EASE }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 id="coleta-modal-title" style={{ margin: 0, fontSize: '1.22rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <h2
+                id="coleta-modal-title"
+                className="serif-display"
+                style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}
+              >
                 Coletar dados oficiais da Câmara
               </h2>
               <button
@@ -77,14 +93,15 @@ export function CollectionDrawer({
                 onClick={onClose}
                 aria-label="Fechar janela de coleta"
               >
-                <X size={16} />
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
 
             <p style={{ margin: '0 0 18px', fontSize: '0.9rem', color: 'var(--ink-secondary)' }}>
               O pipeline consulta a API v2 da Câmara dos Deputados para o estado e ano selecionados,
-              normaliza valores, deduplica registros e atualiza o banco PostgreSQL preservando
-              coletas válidas.
+              normaliza valores, deduplica registros e atualiza o armazenamento{' '}
+              <strong>{resolvedStorage}</strong> preservando coletas válidas. O progresso segue na
+              ilha flutuante sem bloquear a navegação.
             </p>
 
             <form
@@ -96,7 +113,16 @@ export function CollectionDrawer({
               style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.84rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    color: 'var(--ink-primary)',
+                  }}
+                >
                   Unidade federativa (UF)
                   <select
                     className="filter-select"
@@ -111,7 +137,16 @@ export function CollectionDrawer({
                   </select>
                 </label>
 
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.84rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    color: 'var(--ink-primary)',
+                  }}
+                >
                   Ano de referência
                   <select
                     className="filter-select"
@@ -127,7 +162,16 @@ export function CollectionDrawer({
                 </label>
               </div>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.84rem' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  color: 'var(--ink-primary)',
+                }}
+              >
                 Limite opcional de deputados (deixe vazio para coleta completa da UF)
                 <input
                   type="number"
@@ -153,15 +197,19 @@ export function CollectionDrawer({
                 <button type="button" className="btn btn-ghost" onClick={onClose}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  <RefreshCw size={15} />
-                  {submitting ? 'Disparando pipeline...' : `Coletar ${uf}/${ano}`}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submitting}
+                >
+                  <RefreshCw size={15} aria-hidden="true" />
+                  {submitting ? 'Disparando pipeline…' : `Coletar ${uf}/${ano}`}
                 </button>
               </div>
             </form>
           </motion.div>
         </motion.div>
-      )}
+      ) : null}
     </AnimatePresence>
   );
-}
+});

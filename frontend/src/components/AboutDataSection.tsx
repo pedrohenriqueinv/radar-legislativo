@@ -1,5 +1,6 @@
+import { memo } from 'react';
 import { BookOpen, Database, ExternalLink, ShieldCheck } from 'lucide-react';
-import type { ExecucaoOut, HealthResponse, OverviewResponse } from '../types/api';
+import type { ExecucaoOut, HealthResponse, MetaResponse, OverviewResponse } from '../types/api';
 import { formatDateTimeBR, formatInt, getStatusMeta } from '../utils/format';
 import { AnimatedContent } from './motion/AnimatedContent';
 
@@ -7,9 +8,23 @@ interface AboutDataSectionProps {
   overview: OverviewResponse | null;
   execucoes: ExecucaoOut[];
   health: HealthResponse | null;
+  meta?: MetaResponse | null;
 }
 
-export function AboutDataSection({ overview, execucoes, health }: AboutDataSectionProps) {
+export const AboutDataSection = memo(function AboutDataSection({
+  overview,
+  execucoes,
+  health,
+  meta,
+}: AboutDataSectionProps) {
+  const activeStorageLabel = health
+    ? health.database_connected
+      ? health.storage_label
+      : 'Indisponível'
+    : (meta?.storage_label ?? 'Conectando…');
+
+  const etlStorageName = health?.storage_label || meta?.storage_label || 'banco relacional';
+
   return (
     <section id="sobre-dados" className="page-section">
       <div className="container">
@@ -26,8 +41,16 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
         <AnimatedContent>
           <div className="about-grid">
             <article className="panel-card">
-              <h3 style={{ margin: '0 0 12px', fontSize: '1.08rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Database size={17} color="var(--accent-bright)" />
+              <h3
+                style={{
+                  margin: '0 0 12px',
+                  fontSize: '1.08rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <Database size={17} color="var(--accent-bright)" aria-hidden="true" />
                 Fonte oficial e pipeline ETL
               </h3>
               <p style={{ margin: '0 0 10px', color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
@@ -40,21 +63,30 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                   API Dados Abertos da Câmara dos Deputados (v2)
                 </a>
                 . Para cada combinação de UF e ano, o pipeline mapeia automaticamente as
-                legislaturas vigentes no ano via <code className="mono">/legislaturas</code>, consulta
-                os deputados daquela UF com paginação automática pelos links <code className="mono">next</code> e
-                carrega histórico de mandatos e todas as páginas de despesas (<code className="mono">itens=100</code>).
+                legislaturas vigentes no ano via <code className="mono">/legislaturas</code>,
+                consulta os deputados daquela UF com paginação automática pelos links{' '}
+                <code className="mono">next</code> e carrega histórico de mandatos e todas as
+                páginas de despesas (<code className="mono">itens=100</code>).
               </p>
               <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
                 Cada despesa passa por limpeza textual, parsing de datas, deduplicação por chave
-                SHA-256 idempotente (tratando <code className="mono">codDocumento=0</code> e múltiplos trechos
-                aéreos) e upsert relacional em PostgreSQL preservando execuções válidas anteriores em
-                caso de falha parcial.
+                SHA-256 idempotente (tratando <code className="mono">codDocumento=0</code> e
+                múltiplos trechos aéreos) e upsert relacional em <strong>{etlStorageName}</strong>{' '}
+                preservando execuções válidas anteriores em caso de falha parcial.
               </p>
             </article>
 
             <article className="panel-card">
-              <h3 style={{ margin: '0 0 12px', fontSize: '1.08rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ShieldCheck size={17} color="var(--accent-bright)" />
+              <h3
+                style={{
+                  margin: '0 0 12px',
+                  fontSize: '1.08rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <ShieldCheck size={17} color="var(--accent-bright)" aria-hidden="true" />
                 Significado da CEAP, normalização e limitações
               </h3>
               <p style={{ margin: '0 0 10px', color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
@@ -71,9 +103,10 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
               </p>
               <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: '0.92rem' }}>
                 <strong>Decisão técnica verificada na API:</strong> endpoints de despesas fora de
-                SIGEPA retornam <code className="mono">valorLiquido</code> negativo mesmo com documento positivo;
-                o pipeline normaliza o valor líquido (<code className="mono">valorDocumento - valorGlosa</code>)
-                mantendo <code className="mono">valor_liquido_api_raw</code> intacto e preservando
+                SIGEPA retornam <code className="mono">valorLiquido</code> negativo mesmo com
+                documento positivo; o pipeline normaliza o valor líquido (
+                <code className="mono">valorDocumento - valorGlosa</code>) mantendo{' '}
+                <code className="mono">valor_liquido_api_raw</code> intacto e preservando
                 créditos/estornos negativos genuínos (SIGEPA). Documentos digitais podem ainda estar
                 pendentes de digitalização na fonte para meses recentes.
               </p>
@@ -81,13 +114,22 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
           </div>
 
           <div className="panel-card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <BookOpen size={16} color="var(--accent-bright)" />
+            <div className="about-env-bar">
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '1.05rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <BookOpen size={16} color="var(--accent-bright)" aria-hidden="true" />
                 Ambiente atual e documentação oficial
               </h3>
-              <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-                Banco ativo: {health?.database_connected ? health.storage_label : "Indisponível"} · Recorte atual: {overview?.uf ?? "-"} / {overview?.ano ?? "-"}
+              <span className="mono about-env-meta">
+                Banco ativo: {activeStorageLabel} · Recorte atual: {overview?.uf ?? '-'} /{' '}
+                {overview?.ano ?? '-'}
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: '0.88rem' }}>
@@ -98,7 +140,7 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 className="btn btn-sm"
               >
                 Swagger API Câmara v2
-                <ExternalLink size={13} />
+                <ExternalLink size={13} aria-hidden="true" />
               </a>
               <a
                 href="https://www2.camara.leg.br/transparencia/acesso-a-informacao/copy_of_perguntas-frequentes/cota-para-o-exercicio-da-atividade-parlamentar"
@@ -107,7 +149,7 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 className="btn btn-sm"
               >
                 Regras oficiais da Cota Parlamentar
-                <ExternalLink size={13} />
+                <ExternalLink size={13} aria-hidden="true" />
               </a>
               <a
                 href="https://www.camara.leg.br/cota-parlamentar/"
@@ -116,7 +158,7 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 className="btn btn-sm"
               >
                 Portal da Cota Parlamentar
-                <ExternalLink size={13} />
+                <ExternalLink size={13} aria-hidden="true" />
               </a>
             </div>
           </div>
@@ -130,8 +172,8 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                 Nenhuma execução registrada no banco até o momento.
               </p>
             ) : (
-              <div className="table-scroll">
-                <table className="data-table">
+              <div className="table-scroll audit-table-wrap">
+                <table className="data-table audit-table">
                   <thead>
                     <tr>
                       <th>Execução</th>
@@ -148,31 +190,41 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
                       const st = getStatusMeta(ex.status);
                       return (
                         <tr key={ex.id}>
-                          <td className="mono">#{ex.id}</td>
-                          <td>
+                          <td className="mono" data-label="Execução">
+                            #{ex.id}
+                          </td>
+                          <td data-label="Recorte">
                             <strong>{ex.uf}</strong> · {ex.ano}
                           </td>
-                          <td>
+                          <td
+                            data-label="Status"
+                            data-span={ex.resumo_erros ? 'full' : undefined}
+                          >
                             <span className={`status-pill status-pill--${st.tone}`}>
                               {st.label}
                             </span>
-                            {ex.resumo_erros && (
-                              <div style={{ fontSize: '0.74rem', color: 'var(--status-warn)', marginTop: 4 }}>
-                                {ex.resumo_erros}
-                              </div>
-                            )}
+                            {ex.resumo_erros ? (
+                              <div className="audit-error-note">{ex.resumo_erros}</div>
+                            ) : null}
                           </td>
-                          <td className="tabular">{ex.legislaturas_consultadas.join(', ') || '—'}</td>
-                          <td className="num-col">
-                            {formatInt(ex.deputados_processados)} / {formatInt(ex.deputados_esperados)}
-                            {ex.deputados_com_erro > 0 && ` (${ex.deputados_com_erro} erro)`}
+                          <td className="tabular" data-label="Legislaturas">
+                            {ex.legislaturas_consultadas.join(', ') || '—'}
                           </td>
-                          <td className="num-col">
+                          <td className="num-col" data-label="Deputados">
+                            {formatInt(ex.deputados_processados)} /{' '}
+                            {formatInt(ex.deputados_esperados)}
+                            {ex.deputados_com_erro > 0
+                              ? ` (${ex.deputados_com_erro} erro)`
+                              : ''}
+                          </td>
+                          <td className="num-col" data-label="Despesas (novas / atualiz.)">
                             {formatInt(ex.despesas_coletadas)} ({formatInt(ex.despesas_inseridas)} /{' '}
                             {formatInt(ex.despesas_atualizadas)})
                           </td>
-                          <td className="tabular">
-                            {ex.finalizado_em ? formatDateTimeBR(ex.finalizado_em) : 'Em execução...'}
+                          <td className="tabular" data-label="Finalizado em">
+                            {ex.finalizado_em
+                              ? formatDateTimeBR(ex.finalizado_em)
+                              : 'Em execução...'}
                           </td>
                         </tr>
                       );
@@ -186,4 +238,4 @@ export function AboutDataSection({ overview, execucoes, health }: AboutDataSecti
       </div>
     </section>
   );
-}
+});

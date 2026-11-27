@@ -1,47 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
-import { animate, useInView, useReducedMotion } from 'motion/react';
+import { animate, useReducedMotion } from 'motion/react';
 import { formatBRL, formatInt, formatPct } from '../../utils/format';
 
 interface AnimatedNumberProps {
   value: number;
   kind?: 'brl' | 'brl_whole' | 'int' | 'pct';
   duration?: number;
+  /** Kept for backward compatibility; first paint always displays the real value (never flashes 0). */
   animateOnMount?: boolean;
   className?: string;
 }
 
-const CONTRA_EASE: [number, number, number, number] = [0.48, 0.05, 0.35, 0.99];
+const EDITORIAL_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /**
- * Contador numérico animado inspirado em Contra Labs 2026 e no vídeo de referência:
- * anima suavemente de 0 na entrada do viewport e interpola entre valores ao trocar filtros.
+ * Editorial tabular number display that ALWAYS renders the real value on first paint
+ * (zero "0" or "R$ 0,00" flash before scroll) and smoothly interpolates when filters
+ * or active cuts update the value. Respects prefers-reduced-motion.
  */
 export function AnimatedNumber({
   value,
   kind = 'brl',
-  duration = 0.72,
-  animateOnMount = true,
+  duration = 0.48,
   className = '',
 }: AnimatedNumberProps) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-5% 0px' });
   const shouldReduce = useReducedMotion();
-  const initialValue = shouldReduce || !animateOnMount ? value : 0;
-  const [displayVal, setDisplayVal] = useState(initialValue);
-  const prevRef = useRef(initialValue);
+  const [displayVal, setDisplayVal] = useState<number>(value);
+  const prevRef = useRef<number>(value);
 
   useEffect(() => {
-    if (shouldReduce) {
+    if (shouldReduce || !Number.isFinite(value) || !Number.isFinite(prevRef.current)) {
       prevRef.current = value;
       setDisplayVal(value);
       return;
     }
-    if (!inView) return;
 
     const from = prevRef.current;
+    if (from === value) {
+      setDisplayVal(value);
+      return;
+    }
+
     const controls = animate(from, value, {
       duration,
-      ease: CONTRA_EASE,
+      ease: EDITORIAL_EASE,
       onUpdate: (latest) => {
         prevRef.current = latest;
         setDisplayVal(latest);
@@ -53,7 +55,7 @@ export function AnimatedNumber({
     });
 
     return () => controls.stop();
-  }, [value, inView, shouldReduce, duration]);
+  }, [value, shouldReduce, duration]);
 
   let formatted: string;
   if (kind === 'brl') {
@@ -66,9 +68,5 @@ export function AnimatedNumber({
     formatted = formatInt(displayVal);
   }
 
-  return (
-    <span ref={ref} className={`tabular ${className}`}>
-      {formatted}
-    </span>
-  );
+  return <span className={`tabular ${className}`}>{formatted}</span>;
 }

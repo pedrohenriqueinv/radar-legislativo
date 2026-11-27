@@ -144,7 +144,11 @@
 
 .radar-hero__series-heading {
   justify-content: space-between;
-  margin-bottom: 9px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 15;
 }
 
 .radar-hero__series-heading h2 {
@@ -153,18 +157,89 @@
   line-height: 1.25;
 }
 
+.radar-hero__series-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .radar-hero__series-readout {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
   color: var(--hero-muted);
   font-size: 0.78rem;
   font-variant-numeric: lining-nums tabular-nums;
 }
 
+.radar-hero__delta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.69rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.radar-hero__delta-pill--up {
+  background: rgba(206, 66, 51, 0.24);
+  border: 1px solid rgba(255, 189, 158, 0.36);
+  color: #ffd3be;
+}
+
+.radar-hero__delta-pill--down {
+  background: rgba(29, 104, 72, 0.3);
+  border: 1px solid rgba(132, 211, 173, 0.36);
+  color: #c8f0db;
+}
+
+/* Hero methodology trigger & upward popover (clear of all monthly bars on every viewport) */
+.radar-hero__method-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 30;
+}
+
+.radar-hero__method-anchor .method-trigger {
+  width: 34px;
+  height: 34px;
+  background: rgba(37, 32, 26, 0.88);
+  border-color: #88766b;
+  color: var(--hero-ink);
+}
+
+.radar-hero__method-anchor .method-trigger:hover {
+  background: #3c302a;
+  border-color: var(--hero-focus);
+  color: var(--hero-ink);
+}
+
+.radar-hero__method-anchor .method-popover-card {
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 10px);
+  right: 0;
+  left: auto;
+  z-index: 45;
+  color: var(--ink-primary);
+  width: min(330px, calc(100vw - 2 * var(--hero-inset)));
+  max-width: calc(100vw - 2 * var(--hero-inset));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+}
+
+/* Monthly rounded-top bar stage */
 .radar-hero__bars {
-  --plot-height: clamp(76px, 15svh, 215px);
+  --plot-height: clamp(82px, 15.5svh, 215px);
   position: relative;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
+  z-index: 2;
 }
 
 .radar-hero__gridlines {
@@ -172,7 +247,7 @@
   inset: 0 0 auto;
   height: var(--plot-height);
   pointer-events: none;
-  background-image: linear-gradient(to bottom, rgb(255 246 235 / 14%) 1px, transparent 1px);
+  background-image: linear-gradient(to bottom, rgb(255 246 235 / 12%) 1px, transparent 1px);
   background-size: 100% 25%;
 }
 
@@ -182,12 +257,52 @@
   border-top: 1px solid #9e8679;
 }
 
+/* Horizontal dashed AVG reference line & pill */
+.radar-hero__avg-line {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 1.5px dashed rgba(255, 246, 235, 0.36);
+  z-index: 4;
+  transition: bottom 240ms var(--ease-editorial);
+}
+
+.radar-hero__avg-pill {
+  position: absolute;
+  right: 0;
+  bottom: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #25201a;
+  border: 1px solid rgba(255, 246, 235, 0.28);
+  color: #fff6eb;
+  font-size: 0.69rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.36);
+}
+
+.radar-hero__avg-line--flip .radar-hero__avg-pill {
+  bottom: auto;
+  top: 5px;
+}
+
+.radar-hero__avg-tag {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--hero-focus);
+}
+
 .radar-hero__month {
   min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  position: relative;
 }
 
 .radar-hero__track {
@@ -198,21 +313,39 @@
 
 .radar-hero__bar {
   position: absolute;
-  inset-inline: 8%;
-  background: var(--hero-bar);
-  border-radius: 2px;
+  inset-inline: 9%;
+  background: linear-gradient(180deg, #e28c74 0%, #c65b45 62%, #b83628 100%);
+  border-radius: 6px 6px 2px 2px;
   animation: radar-bar-rise 560ms var(--ease-out-expo) both;
   animation-delay: calc(var(--bar-order) * 24ms);
-  transition: background-color 230ms, opacity 230ms;
+  transition: background 200ms ease, opacity 200ms ease, box-shadow 220ms ease;
+}
+
+.radar-hero__bar--neg {
+  border-radius: 2px 2px 6px 6px;
+  background: linear-gradient(0deg, #c67c63 0%, #8f4739 100%);
+}
+
+.radar-hero__bar--empty {
+  min-height: 2px;
+  background: rgba(255, 246, 235, 0.16);
 }
 
 .radar-hero__bars:has([data-active='true']) [data-active='false'] .radar-hero__bar {
-  opacity: 0.64;
+  opacity: 0.44;
 }
 
 .radar-hero__month[data-active='true'] .radar-hero__bar {
-  background: var(--hero-ink);
-  box-shadow: 0 0 0 1px var(--hero-ink);
+  background: linear-gradient(180deg, #ffbd9e 0%, #ce4233 38%, #96291d 100%);
+  box-shadow:
+    0 0 22px rgba(206, 66, 51, 0.52),
+    0 0 0 1px rgba(255, 189, 158, 0.55),
+    inset 0 1px 0 rgba(255, 246, 235, 0.68);
+  z-index: 3;
+}
+
+.radar-hero__month[data-active='true'] .radar-hero__bar--neg {
+  background: linear-gradient(0deg, #ffbd9e 0%, #ce4233 45%, #96291d 100%);
 }
 
 .radar-hero__month-label {
@@ -221,6 +354,7 @@
   margin-top: 6px;
   color: var(--hero-muted);
   font-size: clamp(0.67rem, 0.92vw, 0.8rem);
+  transition: color 160ms ease;
 }
 
 .radar-hero__month[data-active='true'] .radar-hero__month-label {
@@ -229,8 +363,12 @@
 }
 
 @keyframes radar-bar-rise {
-  from { transform: scaleY(0); }
-  to { transform: scaleY(1); }
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .radar-hero__timeline {
@@ -256,13 +394,21 @@
 .radar-hero__range::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 4px;
-  background: linear-gradient(to right, var(--hero-bar) var(--timeline-progress), #846c5d var(--timeline-progress));
+  background: linear-gradient(
+    to right,
+    var(--hero-bar) var(--timeline-progress),
+    #846c5d var(--timeline-progress)
+  );
 }
 
 .radar-hero__range::-moz-range-track {
   height: 4px;
   border-radius: 4px;
-  background: linear-gradient(to right, var(--hero-bar) var(--timeline-progress), #846c5d var(--timeline-progress));
+  background: linear-gradient(
+    to right,
+    var(--hero-bar) var(--timeline-progress),
+    #846c5d var(--timeline-progress)
+  );
 }
 
 .radar-hero__range::-webkit-slider-thumb {
@@ -325,25 +471,6 @@
   height: 12px;
 }
 
-.radar-hero__source .method-trigger {
-  width: 44px;
-  height: 44px;
-  background: var(--hero-bg);
-  border-color: #88766b;
-  color: var(--hero-ink);
-}
-
-.radar-hero__source .method-trigger:hover {
-  background: #3c302a;
-}
-
-.radar-hero__source .method-popover-card {
-  top: auto;
-  bottom: calc(100% + 8px);
-  color: var(--ink-primary);
-  max-width: calc(100vw - 2 * var(--gutter));
-}
-
 .radar-hero :focus-visible {
   outline-color: var(--hero-focus);
 }
@@ -404,21 +531,32 @@
   }
 
   .radar-hero__bars {
-    --plot-height: clamp(70px, 13svh, 130px);
+    --plot-height: clamp(76px, 13.5svh, 130px);
+  }
+
+  .radar-hero__avg-pill {
+    font-size: 0.64rem;
+    padding: 2px 6px;
   }
 }
 
 @media (max-width: 640px) {
-  .radar-hero__source .method-popover-card {
-    bottom: 18px;
-    left: var(--gutter);
-    right: var(--gutter);
+  /* Keep upward anchoring above the bars even below 640px so global.css fixed-bottom rule never covers Ago-Dez */
+  .radar-hero__method-anchor .method-popover-card {
+    position: absolute;
+    top: auto;
+    bottom: calc(100% + 10px);
+    left: auto;
+    right: 0;
+    width: min(310px, calc(100vw - 2 * var(--hero-inset)));
+    max-width: calc(100vw - 2 * var(--hero-inset));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .radar-hero__bar {
     animation: none;
+    transition: none;
   }
 
   .radar-hero__intro button:hover svg {

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, Check, RefreshCw } from 'lucide-react';
 import type { DeputadoCardOut, MetaResponse, OverviewResponse } from '../types/api';
 import {
@@ -10,10 +10,17 @@ import {
   shortenCategory,
 } from '../utils/format';
 import { AnimatedContent } from './motion/AnimatedContent';
+import { FluidTooltip, FluidTooltipGroup } from './motion/FluidTooltip';
 import { AnimatedHBar } from './motion/InViewBar';
 
 const REGIONS = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'] as const;
 type BrazilRegion = (typeof REGIONS)[number];
+
+const TAB_INDICATOR_SPRING = {
+  type: 'spring' as const,
+  stiffness: 420,
+  damping: 34,
+};
 
 interface StateExplorerSectionProps {
   meta: MetaResponse | null;
@@ -26,7 +33,7 @@ interface StateExplorerSectionProps {
   onOpenCollectionModal: () => void;
 }
 
-export function StateExplorerSection({
+export const StateExplorerSection = memo(function StateExplorerSection({
   meta,
   overview,
   deputados,
@@ -38,6 +45,7 @@ export function StateExplorerSection({
 }: StateExplorerSectionProps) {
   const [viewMode, setViewMode] = useState<'grafico' | 'tabela'>('grafico');
   const [hoveredCat, setHoveredCat] = useState<string | null>(null);
+  const shouldReduce = useReducedMotion();
 
   const selectedTile = useMemo(
     () => BRAZIL_TILE_GRID.find((t) => t.uf === selectedUf),
@@ -62,6 +70,24 @@ export function StateExplorerSection({
     return map;
   }, [meta]);
 
+  // Single-pass stats per region for FluidTooltip labels and counts
+  const regionStatsMap = useMemo(() => {
+    const stats = new Map<BrazilRegion, { total: number; collected: number }>();
+    for (const reg of REGIONS) {
+      stats.set(reg, { total: 0, collected: 0 });
+    }
+    for (const tile of BRAZIL_TILE_GRID) {
+      const reg = tile.regiao as BrazilRegion;
+      const entry = stats.get(reg);
+      if (!entry) continue;
+      entry.total += 1;
+      if (ufSummaryMap.get(tile.uf)?.anos_disponiveis.includes(selectedAno)) {
+        entry.collected += 1;
+      }
+    }
+    return stats;
+  }, [ufSummaryMap, selectedAno]);
+
   const regionUfs = useMemo(() => {
     const list = BRAZIL_TILE_GRID.filter((t) => t.regiao === activeRegion);
     return [...list].sort((a, b) => {
@@ -74,11 +100,7 @@ export function StateExplorerSection({
     });
   }, [activeRegion, selectedAno, selectedUf, ufSummaryMap]);
 
-  const collectedInRegion = useMemo(
-    () =>
-      regionUfs.filter((t) => ufSummaryMap.get(t.uf)?.anos_disponiveis.includes(selectedAno)).length,
-    [regionUfs, selectedAno, ufSummaryMap]
-  );
+  const collectedInRegion = regionStatsMap.get(activeRegion)?.collected ?? 0;
 
   const selectedUfName =
     overview?.uf_nome ?? selectedTile?.nome ?? ufSummaryMap.get(selectedUf)?.nome ?? selectedUf;
@@ -115,30 +137,41 @@ export function StateExplorerSection({
                 </p>
               </div>
 
-              <div className="region-tabs-bar" role="tablist" aria-label="Regiões do Brasil">
-                {REGIONS.map((reg) => {
-                  const isActive = activeRegion === reg;
-                  return (
-                    <button
-                      key={reg}
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      className={`region-tab-btn ${isActive ? 'region-tab-btn--active' : ''}`}
-                      onClick={() => setActiveRegion(reg)}
-                    >
-                      <span>{reg}</span>
-                      {isActive && (
-                        <motion.span
-                          layoutId="region-tab-indicator"
-                          className="region-tab-underline"
-                          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <FluidTooltipGroup id="state-explorer-regions">
+                <div className="region-tabs-bar" role="tablist" aria-label="Regiões do Brasil">
+                  {REGIONS.map((reg) => {
+                    const isActive = activeRegion === reg;
+                    const stat = regionStatsMap.get(reg);
+                    const collected = stat?.collected ?? 0;
+                    const total = stat?.total ?? 0;
+                    const tooltipText =
+                      collected === 0
+                        ? `${reg} · ${total} UFs (nenhuma coletada em ${selectedAno})`
+                        : `${reg} · ${collected} de ${total} UFs coletadas em ${selectedAno}`;
+
+                    return (
+                      <FluidTooltip key={reg} content={tooltipText} placement="top">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          className={`region-tab-btn ${isActive ? 'region-tab-btn--active' : ''}`}
+                          onClick={() => setActiveRegion(reg)}
+                        >
+                          <span>{reg}</span>
+                          {isActive ? (
+                            <motion.span
+                              layoutId="region-tab-indicator"
+                              className="region-tab-underline"
+                              transition={shouldReduce ? { duration: 0.01 } : TAB_INDICATOR_SPRING}
+                            />
+                          ) : null}
+                        </button>
+                      </FluidTooltip>
+                    );
+                  })}
+                </div>
+              </FluidTooltipGroup>
 
               <div className="region-meta-row">
                 <h4 className="region-active-name">{activeRegion}</h4>
@@ -148,7 +181,11 @@ export function StateExplorerSection({
                 </span>
               </div>
 
-              <div className="uf-editorial-grid" role="listbox" aria-label={`Estados da região ${activeRegion}`}>
+              <div
+                className="uf-editorial-grid"
+                role="listbox"
+                aria-label={`Estados da região ${activeRegion}`}
+              >
                 {regionUfs.map((tile) => {
                   const summary = ufSummaryMap.get(tile.uf);
                   const hasYear = summary?.anos_disponiveis.includes(selectedAno) ?? false;
@@ -184,7 +221,11 @@ export function StateExplorerSection({
                       <div className="uf-editorial-top">
                         <span className="uf-code-badge">{tile.uf}</span>
                         {isSelected ? (
-                          <Check size={14} className="uf-card-icon uf-card-icon--check" aria-hidden="true" />
+                          <Check
+                            size={14}
+                            className="uf-card-icon uf-card-icon--check"
+                            aria-hidden="true"
+                          />
                         ) : (
                           <ArrowRight size={14} className="uf-card-icon" aria-hidden="true" />
                         )}
@@ -199,9 +240,7 @@ export function StateExplorerSection({
               <p className="region-coverage-footnote">
                 {collectedInRegion === 0
                   ? `Nenhuma UF da região possui coleta persistida em ${selectedAno}.`
-                  : `Coleta completa em ${collectedInRegion} ${
-                      collectedInRegion === 1 ? 'das' : 'das'
-                    } ${regionUfs.length} UFs da região em ${selectedAno}.`}
+                  : `Coleta completa em ${collectedInRegion} de ${regionUfs.length} UFs da região em ${selectedAno}.`}
               </p>
             </div>
 
@@ -226,33 +265,43 @@ export function StateExplorerSection({
               <div className="states-cat-bar">
                 <span className="states-cat-kicker">DISTRIBUIÇÃO POR CATEGORIA</span>
 
-                <div className="editorial-view-toggle" role="tablist" aria-label="Formato de categorias">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={viewMode === 'grafico'}
-                    className={`editorial-toggle-btn ${
-                      viewMode === 'grafico' ? 'editorial-toggle-btn--active' : ''
-                    }`}
-                    onClick={() => setViewMode('grafico')}
+                <FluidTooltipGroup id="state-explorer-view-mode">
+                  <div
+                    className="editorial-view-toggle"
+                    role="tablist"
+                    aria-label="Formato de categorias"
                   >
-                    Gráfico
-                  </button>
-                  <span className="editorial-toggle-sep" aria-hidden="true">
-                    /
-                  </span>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={viewMode === 'tabela'}
-                    className={`editorial-toggle-btn ${
-                      viewMode === 'tabela' ? 'editorial-toggle-btn--active' : ''
-                    }`}
-                    onClick={() => setViewMode('tabela')}
-                  >
-                    Tabela
-                  </button>
-                </div>
+                    <FluidTooltip content="Barras proporcionais por categoria" placement="top">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={viewMode === 'grafico'}
+                        className={`editorial-toggle-btn ${
+                          viewMode === 'grafico' ? 'editorial-toggle-btn--active' : ''
+                        }`}
+                        onClick={() => setViewMode('grafico')}
+                      >
+                        Gráfico
+                      </button>
+                    </FluidTooltip>
+                    <span className="editorial-toggle-sep" aria-hidden="true">
+                      /
+                    </span>
+                    <FluidTooltip content="Tabela com lançamentos e participação" placement="top">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={viewMode === 'tabela'}
+                        className={`editorial-toggle-btn ${
+                          viewMode === 'tabela' ? 'editorial-toggle-btn--active' : ''
+                        }`}
+                        onClick={() => setViewMode('tabela')}
+                      >
+                        Tabela
+                      </button>
+                    </FluidTooltip>
+                  </div>
+                </FluidTooltipGroup>
               </div>
 
               {!overview?.has_data ? (
@@ -260,7 +309,13 @@ export function StateExplorerSection({
                   <p style={{ margin: '0 0 12px', fontWeight: 600, color: 'var(--ink-primary)' }}>
                     Nenhuma despesa persistida para {selectedUfName} ({selectedUf}) em {selectedAno}.
                   </p>
-                  <p style={{ margin: '0 0 18px', fontSize: '0.9rem', color: 'var(--ink-secondary)' }}>
+                  <p
+                    style={{
+                      margin: '0 0 18px',
+                      fontSize: '0.9rem',
+                      color: 'var(--ink-secondary)',
+                    }}
+                  >
                     O Radar Legislativo exibe exclusivamente dados reais coletados na API oficial da
                     Câmara dos Deputados. Você pode coletar este recorte agora ou abrir um dos
                     recortes já carregados.
@@ -272,7 +327,7 @@ export function StateExplorerSection({
                       className="btn btn-primary btn-sm"
                       onClick={onOpenCollectionModal}
                     >
-                      <RefreshCw size={14} />
+                      <RefreshCw size={14} aria-hidden="true" />
                       Coletar {selectedUf}/{selectedAno} na Câmara
                     </button>
 
@@ -353,7 +408,7 @@ export function StateExplorerSection({
                 </div>
               )}
 
-              {overview?.has_data && deputados.length > 0 && (
+              {overview?.has_data && deputados.length > 0 ? (
                 <div className="states-detail-cta-row">
                   <button
                     type="button"
@@ -361,10 +416,10 @@ export function StateExplorerSection({
                     onClick={scrollToDeputies}
                   >
                     Ver os {formatInt(deputados.length)} parlamentares
-                    <ArrowRight size={15} />
+                    <ArrowRight size={15} aria-hidden="true" />
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -378,4 +433,4 @@ export function StateExplorerSection({
       </div>
     </section>
   );
-}
+});

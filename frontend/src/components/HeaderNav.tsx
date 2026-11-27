@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { memo, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Bookmark, Search } from 'lucide-react';
+import { FluidTooltip, FluidTooltipGroup } from './motion/FluidTooltip';
 
 interface HeaderNavProps {
   selectedUf: string;
@@ -8,6 +9,7 @@ interface HeaderNavProps {
   onNavigateSection: (sectionId: string) => void;
   onOpenCollectionModal: () => void;
   onSearchDataClick: () => void;
+  onOpenCommandPalette: () => void;
 }
 
 const SECTION_LINKS = [
@@ -17,17 +19,32 @@ const SECTION_LINKS = [
   { id: 'despesas', label: 'Despesas' },
   { id: 'analises', label: 'Análises' },
   { id: 'sobre-dados', label: 'Sobre os dados' },
-];
+] as const;
 
-export function HeaderNav({
+const NAV_INDICATOR_SPRING = {
+  type: 'spring' as const,
+  stiffness: 420,
+  damping: 34,
+};
+
+function getShortcutHint(): string {
+  if (typeof navigator === 'undefined') return 'Ctrl K';
+  const platform = navigator.platform || navigator.userAgent || '';
+  return /Mac|iPhone|iPad|iPod/i.test(platform) ? '⌘K' : 'Ctrl K';
+}
+
+export const HeaderNav = memo(function HeaderNav({
   selectedUf,
   selectedAno,
   onNavigateSection,
   onOpenCollectionModal,
   onSearchDataClick,
+  onOpenCommandPalette,
 }: HeaderNavProps) {
   const [activeSection, setActiveSection] = useState<string>('visao-geral');
   const [scrollHidden, setScrollHidden] = useState(false);
+  const [shortcutHint] = useState<string>(getShortcutHint);
+  const shouldReduce = useReducedMotion();
 
   useEffect(() => {
     const threshold = 12;
@@ -121,39 +138,67 @@ export function HeaderNav({
                   }}
                 >
                   <span>{item.label}</span>
-                  {isActive && (
+                  {isActive ? (
                     <motion.span
                       layoutId="nav-active-underline"
                       className="nav-active-indicator"
-                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      transition={shouldReduce ? { duration: 0.01 } : NAV_INDICATOR_SPRING}
                     />
-                  )}
+                  ) : null}
                 </a>
               );
             })}
           </nav>
 
-          <div className="nav-actions">
-            <button
-              type="button"
-              className="nav-bookmark-btn"
-              onClick={onOpenCollectionModal}
-              title={`Recorte ativo: ${selectedUf} · ${selectedAno}. Clique para coletar ou trocar UF/Ano`}
-              aria-label={`Recorte ativo ${selectedUf} ${selectedAno} — abrir seleção e coleta`}
-            >
-              <Bookmark size={16} />
-              <span className="nav-bookmark-tag tabular">
-                {selectedUf} · {selectedAno}
-              </span>
-            </button>
+          <FluidTooltipGroup id="header-nav-actions">
+            <div className="nav-actions">
+              <FluidTooltip
+                content="Busca rápida: UFs, parlamentares e despesas"
+                shortcut={shortcutHint}
+                placement="bottom"
+              >
+                <button
+                  type="button"
+                  className="nav-cmdk-pill"
+                  onClick={onOpenCommandPalette}
+                  aria-label="Abrir busca rápida e comandos (Ctrl+K ou Cmd+K)"
+                >
+                  <Search size={14} aria-hidden="true" />
+                  <span className="nav-cmdk-label">Buscar</span>
+                  <kbd className="nav-cmdk-kbd">{shortcutHint}</kbd>
+                </button>
+              </FluidTooltip>
 
-            <button type="button" className="nav-explore-pill" onClick={onSearchDataClick}>
-              <Search size={14} />
-              <span>Explorar os dados</span>
-            </button>
-          </div>
+              <FluidTooltip
+                content={`Recorte ativo: ${selectedUf} · ${selectedAno} — coletar ou trocar`}
+                placement="bottom"
+              >
+                <button
+                  type="button"
+                  className="nav-bookmark-btn"
+                  onClick={onOpenCollectionModal}
+                  aria-label={`Recorte ativo ${selectedUf} ${selectedAno} — abrir seleção e coleta`}
+                >
+                  <Bookmark size={16} aria-hidden="true" />
+                  <span className="nav-bookmark-tag tabular">
+                    {selectedUf} · {selectedAno}
+                  </span>
+                </button>
+              </FluidTooltip>
+
+              <FluidTooltip
+                content="Ir direto para filtros e busca de despesas"
+                placement="bottom"
+              >
+                <button type="button" className="nav-explore-pill" onClick={onSearchDataClick}>
+                  <Search size={14} aria-hidden="true" />
+                  <span>Explorar os dados</span>
+                </button>
+              </FluidTooltip>
+            </div>
+          </FluidTooltipGroup>
         </div>
       </div>
     </header>
   );
-}
+});
